@@ -46,12 +46,12 @@
 # 
 # END BPS TAGGED BLOCK }}}
 
-package RT::Ticket;
-
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+package RT::Extension::TicketLocking;
+
+our $VERSION = '0.03';
 
 =head1 NAME
 
@@ -213,6 +213,8 @@ from highest priority to lowest:
 This allow us to store only one lock record with higher priority.
 
 =cut
+
+package RT::Ticket;
 
 our @LockTypes = qw(Auto Hard);
 
