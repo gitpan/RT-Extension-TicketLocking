@@ -51,7 +51,7 @@ use warnings;
 
 package RT::Extension::TicketLocking;
 
-our $VERSION = '0.03';
+our $VERSION = '0.05';
 
 =head1 NAME
 
@@ -214,6 +214,7 @@ This allow us to store only one lock record with higher priority.
 
 =cut
 
+use RT::Ticket;
 package RT::Ticket;
 
 our @LockTypes = qw(Auto Hard);
@@ -293,9 +294,7 @@ sub BreakLock {
 }
 
 
-
-
-
+use RT::User;
 package RT::User;
 
 sub GetLocks {
