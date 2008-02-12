@@ -51,7 +51,7 @@ use warnings;
 
 package RT::Extension::TicketLocking;
 
-our $VERSION = '0.05';
+our $VERSION = '0.08';
 
 =head1 NAME
 
@@ -66,7 +66,7 @@ Locks can be of several different types. Current types are:
 =item hard (manual) lock
 
 A lock can be initiated manually by clicking the "Lock" link on one of the pages
-for the ticket.
+for the ticket. However, hard locks are available only to users who can ModifyTicket.
 
 =item take lock
 
@@ -117,7 +117,7 @@ of the pages for the ticket. This removes B<any> type of lock.
 =item * The user logs out
 
 =item * A configurable expiry period has elapsed (if the $LockExpiry
-config variable has been set to a true value)
+config variable has been set to a value greater than zero)
 
 =back
 
@@ -217,20 +217,37 @@ This allow us to store only one lock record with higher priority.
 use RT::Ticket;
 package RT::Ticket;
 
-our @LockTypes = qw(Auto Hard);
+our @LockTypes = qw(Auto Take Hard);
+our %CheckRightOnLock = (
+    Hard => 'ModifyTicket',
+);
+
+sub LockPriority {
+    my $self = shift;
+    my $type = shift;
+    
+    my $priority;
+    for( my $i = 0; $i < scalar @LockTypes; $i++) {
+        $priority = $i if lc( $LockTypes[ $i ] ) eq lc( $type );
+    }
+    $RT::Logger->error( "There is no type '$type' in the list of lock types")
+        unless defined $priority;
+
+    return $priority || 0;
+}
 
 sub Locked {
     my $ticket = shift;
+
     my $lock = $ticket->FirstAttribute('RT_Lock');
-    if($lock) {
-        my $duration = time() - $lock->Content->{'Timestamp'};
-        my $expiry = RT->Config->Get('LockExpiry');
-        if($expiry) {
-            unless($duration < $expiry) {
-                $ticket->DeleteAttribute('RT_Lock');
-                undef $lock;
-            }
-        }
+    return $lock unless $lock;
+
+    return $lock unless my $expiry = RT->Config->Get('LockExpiry');
+
+    my $duration = time() - $lock->Content->{'Timestamp'};
+    unless ( $duration < $expiry ) {
+        $ticket->DeleteAttribute('RT_Lock');
+        undef $lock;
     }
     return $lock;
 }
@@ -241,15 +258,14 @@ sub Lock {
 
     if ( my $lock = $ticket->Locked() ) {
         return undef if $lock->Content->{'User'} != $ticket->CurrentUser->id;
-        my $LockType = $lock->Content->{'Type'};
-        my $priority;
-        my $LockPriority;
-        for(my $i = 0; $i < scalar @LockTypes; $i++) {
-            $priority = $i if (lc $LockTypes[$i]) eq (lc $type);
-            $LockPriority = $i if (lc $LockTypes[$i]) eq (lc $LockType);
-        }
-        return undef if $priority <= $LockPriority;
+        my $current_type = $lock->Content->{'Type'};
+        return undef if $ticket->LockPriority( $type ) <= $ticket->LockPriority( $current_type );
     }
+
+    if ( my $right = $CheckRightOnLock{ $type } ) {
+        return undef unless $ticket->CurrentUserHasRight('ModifyTicket');
+    }
+
     $ticket->Unlock($type);    #Remove any existing locks (because this one has greater priority)
     my $id = $ticket->id;
     my $username = $ticket->CurrentUser->Name;
@@ -272,16 +288,13 @@ sub Unlock {
 
     my $lock = $ticket->RT::Ticket::Locked();
     return (undef, "This ticket was not locked.") unless $lock;
-    return (undef, "You cannot unlock a ticket locked by another user.") unless $lock->Content->{User} ==  $ticket->CurrentUser->id;
-    
-    my $LockType = $lock->Content->{'Type'};
-    my $priority;
-    my $LockPriority;
-    for(my $i = 0; $i < scalar @LockTypes; $i++) {
-        $priority = $i if (lc $LockTypes[$i]) eq (lc $type);
-        $LockPriority = $i if (lc $LockTypes[$i]) eq (lc $LockType);
-    }
-    return (undef, "There is a lock with a higher priority on this ticket.") if $priority < $LockPriority;
+    return (undef, "You cannot unlock a ticket locked by another user.")
+        unless $lock->Content->{User} == $ticket->CurrentUser->id;
+
+    my $current_type = $lock->Content->{'Type'};
+    return (undef, "There is a lock with a higher priority on this ticket.")
+        if $ticket->LockPriority( $type ) < $ticket->LockPriority( $current_type );
+
     my $duration = time() - $lock->Content->{'Timestamp'};
     $ticket->DeleteAttribute('RT_Lock');
     return ($duration, "You have unlocked this ticket. It was locked for $duration seconds.");
