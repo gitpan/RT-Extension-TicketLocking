@@ -49,13 +49,13 @@
     <&|/Widgets/TitleBox, title => loc("Tickets locked by you") &>
 % if(@locks) {
     <a href="index.html?UnlockAll=1">Unlock All</a>
-    <table border="0" cellspacing="0" cellpadding="1" width="100%">
+    <table border="0" cellspacing="0" cellpadding="1" width="100%" class="ticket-list">
 
 <%PERL>    
     my $expire_title;
-    $expire_title = {title => '__Expires in__'} if $expiry;
+    $expire_title = {title => 'Expires in'} if $expiry;
     $m->comp('/Elements/CollectionAsTable/Header', 
-        Format => [{title => '__#__'}, {title => '__Subject__'}, {title => '__Time Locked__'}, $expire_title, {title => 'NBSP'}],
+        Format => [{title => '#'}, {title => 'Subject'}, {title => 'Time Locked'}, $expire_title, {title => 'NBSP'}],
         maxitems => ($expiry ? 5 : 4)
     ); 
     
