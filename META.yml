@@ -1,7 +1,7 @@
 ---
 abstract: 'Enables users to place advisory locks on tickets'
 author:
-  - 'Turner Hayes <thayes@bestpractical.com>'
+  - 'Turner Hayes    <thayes@bestpractical.com>'
 build_requires:
   ExtUtils::MakeMaker: 6.59
   Test::More: 0
@@ -24,4 +24,4 @@ requires:
   perl: 5.8.3
 resources:
   license: http://opensource.org/licenses/gpl-2.0.php
-version: 0.11
+version: 0.12
